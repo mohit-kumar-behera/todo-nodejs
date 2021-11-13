@@ -11,37 +11,36 @@ app.set('view engine', 'ejs');
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static('public'));
 
-// //connect to mongoose locally
+// connect to mongoose
 mongoose.connect('mongodb://localhost:27017/todo', {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 });
 
-//items schema
+// Items Schema
 const itemsSchema = new mongoose.Schema({
   name: String,
 });
 
-//model for mongoose
-const Item = mongoose.model('Item', itemsSchema);
-
-//default item to model or document creation
-const item1 = new Item({
-  name: 'Welcome to your todo list',
-});
-const item2 = new Item({
-  name: 'Hit the + button to add a new list',
-});
-const item3 = new Item({
-  name: 'You are ready to Go.',
-});
-
+// List Schema
 const listSchema = new mongoose.Schema({
   name: String,
-  items: [itemsSchema], // Array of listSchema
+  items: [itemsSchema],
 });
 
+const Item = mongoose.model('Item', itemsSchema);
 const List = mongoose.model('List', listSchema);
+
+// Default entry to items
+const item1 = new Item({
+  name: 'Buy Milk',
+});
+const item2 = new Item({
+  name: 'Go to Gym',
+});
+const item3 = new Item({
+  name: 'Meditate for 15 minutes',
+});
 
 app.get('/', function (req, res) {
   Item.find({}, function (err, foundItems) {
@@ -65,17 +64,18 @@ app.get('/', function (req, res) {
 app.post('/', function (req, res) {
   const itemName = req.body.newItem;
   const listName = req.body.list;
+
   const newItem = new Item({
     name: itemName,
   });
+
   if (listName === 'Today') {
+    // Entries added to default list
     newItem.save();
     res.redirect('/');
   } else {
-    //new item comes from a custom list
-    List.findOne({ name: listName }, function (err, foundList) {
-      //foundList is an object
-      //foundList.items is an array and we want to push the newly created items there
+    // Entries added to custom list
+    List.findOne({ name: listName }, function (_, foundList) {
       foundList.items.push(newItem);
       foundList.save();
     });
@@ -84,22 +84,20 @@ app.post('/', function (req, res) {
 });
 
 app.post('/delete', function (req, res) {
-  // console.log(req.body.checkbox);
   const checkedItemID = req.body.checkbox;
   const listName = req.body.listName;
+
   if (listName === 'Today') {
     Item.findByIdAndRemove({ _id: checkedItemID }, function (err) {
       if (err) console.log(err);
       else console.log('Successfully deleted');
-
       res.redirect('/');
     });
   } else {
-    //delete request is coming from custom list
     List.findOneAndUpdate(
       { name: listName },
       { $pull: { items: { _id: checkedItemID } } },
-      function (err, foundList) {
+      function (err) {
         if (!err) {
           res.redirect('/' + listName);
         }
@@ -108,23 +106,21 @@ app.post('/delete', function (req, res) {
   }
 });
 
-//dyanamic routing
 app.get('/:customListName', function (req, res) {
   const customListName = _.capitalize(req.params.customListName);
+
   List.findOne({ name: customListName }, function (err, foundList) {
     if (!err) {
       if (!foundList) {
-        //console.log("List Doesn't exist")
-        //Create a new one
+        // Create a new List
         const list = new List({
           name: customListName,
-          items: [item1, item2, item3],
+          items: [],
         });
         list.save();
         res.redirect('/' + customListName);
       } else {
-        //dont create a new one, list already exists
-        //show the list
+        // List already exists
         res.render('list', {
           listTitle: foundList.name,
           newListItems: foundList.items,
@@ -135,5 +131,5 @@ app.get('/:customListName', function (req, res) {
 });
 
 app.listen(PORT, function () {
-  console.log('Server started on port successfully');
+  console.log(`Server started on port ${PORT} successfully`);
 });
